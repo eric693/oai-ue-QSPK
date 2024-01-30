@@ -1930,7 +1930,6 @@ static void* test_send(void *args){
   recver_addr.sin_port = htons(recver_port);
 
   if(inet_pton(AF_INET, recver_ip, &recver_addr.sin_addr) <= 0) {
-    char *error_msg = strerror(errno);
     LOG_E(NR_MAC, "[TEST SEND] Invalid ip address / Address not supported\n");
     pthread_exit(NULL); // exit chlid thread
   }
