@@ -76,7 +76,7 @@
 #define RECVER_PORT 6666
 #define TEST_TIME 1
 #define MAX_PACKET_LEN 256
-
+#define DECODER_SOCKET_PATH "/home/chrispan/research/semCom-inference/semcom_decoder"
 // ==========
 // NR UE defs
 // ==========

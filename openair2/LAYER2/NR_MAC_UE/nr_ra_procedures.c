@@ -877,19 +877,46 @@ void nr_ue_contention_resolution(module_id_t module_id, int cc_id, frame_t frame
 }
 
 static void * test_recv(void *args){
-  LOG_W(NR_MAC, "[TEST RECV] recver port %d, test time %d\n", RECVER_PORT, TEST_TIME);
+  LOG_W(NR_MAC, "[TEST RECV] recver port %d, decoder socket path %s, test time %d\n", RECVER_PORT, DECODER_SOCKET_PATH, TEST_TIME);
   // recv tcp packet from sender
+
+  ssize_t write_bytes, read_bytes;
+
+  /* connect to decoder socket */
+
+  struct sockaddr_un decoder_addr;
+  int decoder_fd;
+  char decoder_buffer[MAX_PACKET_LEN];
+
+  // create decoder socket
+  if ((decoder_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST RECV] Error create decoder socket: %s\n", error_msg);
+    pthread_exit(NULL); // exit chlid thread
+  }
+
+  // set decoder socket addr
+  memset(&decoder_addr, 0, sizeof(struct sockaddr_un));
+  decoder_addr.sun_family = AF_UNIX;
+  strncpy(decoder_addr.sun_path, DECODER_SOCKET_PATH, sizeof(decoder_addr.sun_path) - 1);
+
+  // connect to decoder
+  if (connect(decoder_fd, (struct sockaddr *)&decoder_addr, sizeof(decoder_addr)) == -1) {
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST RECV] Error connect to decoder: %s\n", error_msg);
+    pthread_exit(NULL); // exit chlid thread
+  }
+
+  /* recver socket */
   struct sockaddr_in recver_addr;
   int recver_port = RECVER_PORT;
   int recver_fd, sender_fd;
-  // char buffer[MAX_PACKET_LEN];
   char recv_buffer[MAX_PACKET_LEN];
-  // char encoder_buffer[MAX_PACKET_LEN];
 
   // create recver socket
   if ((recver_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     char *error_msg = strerror(errno);
-    LOG_E(NR_MAC, "[TEST RECV] Socket error: %s", error_msg);
+    LOG_E(NR_MAC, "[TEST RECV] Socket error: %s\n", error_msg);
     pthread_exit(NULL); // exit chlid thread
   }
 
@@ -902,22 +929,22 @@ static void * test_recv(void *args){
   // bind recver socket 
   if (bind(recver_fd, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) < 0) {
     char *error_msg = strerror(errno);
-    LOG_E(NR_MAC, "[TEST RECV] bind failed: %s", error_msg);
+    LOG_E(NR_MAC, "[TEST RECV] bind failed: %s\n", error_msg);
     pthread_exit(NULL); // exit chlid thread
   }
 
   if (listen(recver_fd, 1) < 0) {
     char *error_msg = strerror(errno);
-    LOG_E(NR_MAC, "[TEST RECV] listen failed: %s", error_msg);
+    LOG_E(NR_MAC, "[TEST RECV] listen failed: %s\n", error_msg);
     pthread_exit(NULL); // exit chlid thread
   }
 
-  // struct timeval time_start;
-  // struct timeval time_end;
+  struct timeval time_start;
+  struct timeval time_end;
   
   int done = 0;
-  // int exceed_10ms = 0;
-  // double diff;
+  int exceed_10ms = 0;
+  double diff;
 
   LOG_W(NR_MAC, "[TEST RECV] Waiting for connections...\n");
 
@@ -927,55 +954,61 @@ static void * test_recv(void *args){
     
     if ((sender_fd = accept(recver_fd, (struct sockaddr*)NULL, NULL)) < 0) {
       char *error_msg = strerror(errno);
-      LOG_E(NR_MAC, "[TEST RECV] accept: %s", error_msg);
+      LOG_E(NR_MAC, "[TEST RECV] accept: %s\n", error_msg);
       continue;
     }
 
     LOG_W(NR_MAC, "[TEST RECV] Client connected\n");
 
     while (1) {
-      ssize_t read_bytes = recv(sender_fd, recv_buffer, MAX_PACKET_LEN - 1, 0);
-      if (read_bytes > 0) {
-          recv_buffer[read_bytes] = '\0'; // ensure string is `\0` terminated
-          LOG_W(NR_MAC, "[TEST RECV] Receive data from sender: %s\n", recv_buffer);
-          // // printf("Received data from sender: %s\n", buffer);
-          // printf("Received data `%s` from sender\n", recv_buffer);
-          
-          // // send data to decoder
-          // gettimeofday(&time_start, NULL); 
-          // write(decoder_fd, recv_buffer, strlen(recv_buffer));
-          // // read response from decoder
-          // read_bytes = read(decoder_fd, encoder_buffer, BUFFER_SIZE - 1);
-          // if (read_bytes < 0){ // client close connection or error occured
-          //     perror("read from encoder error");
-          //     break;
-          // }
-          // encoder_buffer[read_bytes] = '\0';
-          // gettimeofday(&time_end, NULL);
-
-          // printf("Received response `%s` from decoder\n", buffer);
-
-          // diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
-          // printf("Encoding time: %.3f ms\n", diff);
-          // if(!(diff < 10))
-          //     exceed_10ms += 1;
-          
-          // send(sender_fd, "OK\0", strlen("OK\0"), 0);
-      }else{
-        if (read_bytes < 0){ // client close connection or error occured
-          char *error_msg = strerror(errno);
-          LOG_E(NR_MAC, "[TEST RECV] read from sender error: %s", error_msg);
-        }
-        break;
+      // read data from sender
+      read_bytes = recv(sender_fd, recv_buffer, MAX_PACKET_LEN - 1, 0);
+      if (read_bytes < 0){ // client close connection or error occured
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST RECV] read from sender error: %s", error_msg);
+        goto out;
       }
-    }
+      recv_buffer[read_bytes] = '\0'; // ensure string is `\0` terminated
+      LOG_W(NR_MAC, "[TEST RECV] Receive data from sender: %s\n", recv_buffer);
+      
+      // send data to decoder
+      gettimeofday(&time_start, NULL); 
+      write_bytes = write(decoder_fd, recv_buffer, strlen(recv_buffer));
+      if(write_bytes < 0){
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST RECV] Error write to decoder: %s\n", error_msg);
+        goto out;
+      }
+      // read response from decoder
+      read_bytes = read(decoder_fd, decoder_buffer, MAX_PACKET_LEN - 1);
+      if (read_bytes < 0){ // client close connection or error occured
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST RECV] Error read from decoder: %s\n", error_msg);
+        goto out;
+      }
+      decoder_buffer[read_bytes] = '\0';
+      gettimeofday(&time_end, NULL);
 
-    LOG_W(NR_MAC, "[TEST RECV] Client disconnected\n");
+      LOG_W(NR_MAC, "[TEST RECV] Received response `%s` from decoder\n", decoder_buffer);
+
+      diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
+      LOG_W(NR_MAC, "[TEST SEND] Decoding time: %.3f ms\n", diff);
+      if(!(diff < 10))
+          exceed_10ms += 1;
+      
+      // send(sender_fd, "OK\0", strlen("OK\0"), 0);
+    }
     done = 1;
-    close(sender_fd);
   }
-  
-  pthread_exit(NULL); // exit chlid thread
+
+  LOG_W(NR_MAC, "%d/%d exceed 10ms\n", exceed_10ms, TEST_TIME);
+    
+  out: 
+    close(sender_fd);
+    close(recver_fd);
+    close(decoder_fd);
+    LOG_W(NR_MAC, "[TEST RECV] Client disconnected\n");
+    pthread_exit(NULL); // exit chlid thread
 }
 
 // Handlig successful RA completion @ MAC layer
