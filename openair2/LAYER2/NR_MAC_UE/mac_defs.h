@@ -70,6 +70,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+#include <errno.h>
 
 #define RECVER_PORT 6666
 #define TEST_TIME 1

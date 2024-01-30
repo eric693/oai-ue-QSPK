@@ -876,11 +876,8 @@ void nr_ue_contention_resolution(module_id_t module_id, int cc_id, frame_t frame
   }
 }
 
-static void test_recv(){
-  printf("[TEST RECV] line %d, func `%s`\n", __LINE__, __FUNCTION__);
-  printf("[TEST RECV] recver port %d\n", RECVER_PORT);
-  printf("[TEST RECV] test time: %d\n", TEST_TIME);
-
+static void * test_recv(void *args){
+  LOG_W(NR_MAC, "[TEST RECV] recver port %d, test time %d\n", RECVER_PORT, TEST_TIME);
   // recv tcp packet from sender
   struct sockaddr_in recver_addr;
   int recver_port = RECVER_PORT;
@@ -891,8 +888,9 @@ static void test_recv(){
 
   // create recver socket
   if ((recver_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-      perror("socket error");
-      exit(EXIT_FAILURE);
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST RECV] Socket error: %s", error_msg);
+    pthread_exit(NULL); // exit chlid thread
   }
 
   // set recver socket addr
@@ -903,13 +901,15 @@ static void test_recv(){
 
   // bind recver socket 
   if (bind(recver_fd, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) < 0) {
-    perror("bind failed");
-    return;
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST RECV] bind failed: %s", error_msg);
+    pthread_exit(NULL); // exit chlid thread
   }
 
   if (listen(recver_fd, 1) < 0) {
-    perror("listen");
-    return;
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST RECV] listen failed: %s", error_msg);
+    pthread_exit(NULL); // exit chlid thread
   }
 
   // struct timeval time_start;
@@ -919,24 +919,25 @@ static void test_recv(){
   // int exceed_10ms = 0;
   // double diff;
 
-  printf("[TEST RECV] Waiting for connections...\n");
+  LOG_W(NR_MAC, "[TEST RECV] Waiting for connections...\n");
 
   while(1){
     if(done)
         break;
     
     if ((sender_fd = accept(recver_fd, (struct sockaddr*)NULL, NULL)) < 0) {
-      perror("accept");
+      char *error_msg = strerror(errno);
+      LOG_E(NR_MAC, "[TEST RECV] accept: %s", error_msg);
       continue;
     }
 
-    printf("[TEST RECV] Client connected\n");
+    LOG_W(NR_MAC, "[TEST RECV] Client connected\n");
 
     while (1) {
       ssize_t read_bytes = recv(sender_fd, recv_buffer, MAX_PACKET_LEN - 1, 0);
       if (read_bytes > 0) {
           recv_buffer[read_bytes] = '\0'; // ensure string is `\0` terminated
-          printf("[TEST RECV] Receive data from sender: %s\n", recv_buffer);
+          LOG_W(NR_MAC, "[TEST RECV] Receive data from sender: %s\n", recv_buffer);
           // // printf("Received data from sender: %s\n", buffer);
           // printf("Received data `%s` from sender\n", recv_buffer);
           
@@ -961,17 +962,20 @@ static void test_recv(){
           
           // send(sender_fd, "OK\0", strlen("OK\0"), 0);
       }else{
-        if (read_bytes < 0) // client close connection or error occured
-            perror("read from sender error");
+        if (read_bytes < 0){ // client close connection or error occured
+          char *error_msg = strerror(errno);
+          LOG_E(NR_MAC, "[TEST RECV] read from sender error: %s", error_msg);
+        }
         break;
       }
     }
 
-    printf("[TEST RECV] Client disconnected\n");
+    LOG_W(NR_MAC, "[TEST RECV] Client disconnected\n");
     done = 1;
     close(sender_fd);
   }
-  return;
+  
+  pthread_exit(NULL); // exit chlid thread
 }
 
 // Handlig successful RA completion @ MAC layer
@@ -980,7 +984,11 @@ static void test_recv(){
 // - complete handling of received contention-based RA preamble
 void nr_ra_succeeded(const module_id_t mod_id, const uint8_t gNB_index, const frame_t frame, const int slot)
 {
-  test_recv();
+  // call test_recv in another thread
+  pthread_t thread_id;
+  pthread_create(&thread_id, NULL, test_recv, NULL);
+  pthread_detach(thread_id); 
+
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
   RA_config_t *ra = &mac->ra;
 
@@ -1008,7 +1016,6 @@ void nr_ra_succeeded(const module_id_t mod_id, const uint8_t gNB_index, const fr
 // - complete handling of received contention-based RA preamble
 void nr_ra_failed(uint8_t mod_id, uint8_t CC_id, NR_PRACH_RESOURCES_t *prach_resources, frame_t frame, int slot)
 {
-  test_recv();
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
   RA_config_t *ra = &mac->ra;
   // Random seed generation
