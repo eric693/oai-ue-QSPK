@@ -104,6 +104,7 @@
 #define TEST_TIME 1
 #define EXAMPLE_LEN 1
 #define MAX_PACKET_LEN 256
+#define ENCODER_SOCKET_PATH "/home/chrispan/research/semCom-inference/semcom_encoder"
 
 /* Defs */
 #define MAX_NUM_BWP 5

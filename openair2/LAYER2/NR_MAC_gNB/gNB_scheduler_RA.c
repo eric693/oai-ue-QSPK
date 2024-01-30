@@ -1911,17 +1911,32 @@ static void nr_generate_Msg4(module_id_t module_idP,
 }
 
 static void* test_send(void *args){
-  LOG_W(NR_MAC, "[TEST SEND] recver ip %s:%d, test time: %d\n", RECVER_IP, RECVER_PORT, TEST_TIME);
+  LOG_W(NR_MAC, "[TEST SEND] recver ip %s:%d, encoder socket path %s, test time: %d\n", RECVER_IP, RECVER_PORT, ENCODER_SOCKET_PATH, TEST_TIME);
   // send tcp packet
   const char * const SemanticRL_example[EXAMPLE_LEN] = {
     "planets engage in an eternal graceful dance around sun rise\0"
   };
-  // char *response = (char*)malloc(sizeof(char) * MAX_PACKET_LEN);
+  char response[MAX_PACKET_LEN];
 
+  /* connect to encoder */
+  int encoder_socket;
+  struct sockaddr_un encoder_addr;
+  encoder_socket = socket(AF_UNIX, SOCK_STREAM, 0);
+
+  encoder_addr.sun_family = AF_UNIX;
+  strcpy(encoder_addr.sun_path, ENCODER_SOCKET_PATH);// unix socket path
+
+  if(connect(encoder_socket, (struct sockaddr *)&encoder_addr, sizeof(encoder_addr)) == -1){
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST SEND] connect to encoder fail: %s\n", error_msg);
+    pthread_exit(NULL); // exit chlid thread
+  }
+
+  /* connect to recver */
   char *recver_ip = RECVER_IP;
   int recver_port = RECVER_PORT;
   int recver_socket;
-  int write_bytes;
+  ssize_t write_bytes, read_bytes;
   struct sockaddr_in recver_addr;
 
   recver_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -1936,57 +1951,69 @@ static void* test_send(void *args){
 
   if(connect(recver_socket, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) == -1){
     char *error_msg = strerror(errno);
-    LOG_E(NR_MAC, "[TEST SEND] Error connect to recver %s\n", error_msg);
+    LOG_E(NR_MAC, "[TEST SEND] Error connect to recver: %s\n", error_msg);
     pthread_exit(NULL); // exit chlid thread
   }
 
-  // struct timeval time_start;
-  // struct timeval time_end;
+  struct timeval time_start;
+  struct timeval time_end;
 
-  // int exceed_10ms = 0;
-  // double diff;
+  int exceed_10ms = 0;
+  double diff;
     
   for(int t = 0;t < TEST_TIME;t++){
     for(int i = 0;i < EXAMPLE_LEN;i++){
-      // gettimeofday(&time_start, NULL); 
-      // // send input to encoder
-      // write(encoder_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
-      // // read response from encoder
-      // read(encoder_socket, response, MAX_PACKET_LEN);    
-      // gettimeofday(&time_end, NULL); // encoding time
-      // printf("Client: Recieve response `%s` from encoder\n", response);
-      
-      // printf("Client: Recieve response\n\t`%s`\nfrom encoder\n", response);
-      
-      // diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
-      // printf("Encoding time: %.3f ms\n", diff);
-      // if(!(diff < 10))
-      //     exceed_10ms += 1;
-
-      // send encoding response to recver
-      // write(recver_socket, response, strlen(response));
-      // send(recver_socket, response, strlen(response), 0);
-      // wait for recver ok
-      // read(recver_socket, response, MAX_PACKET_LEN);
-      // recv(recver_socket, response, MAX_PACKET_LEN, 0);
-
-      write_bytes = write(recver_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
+      gettimeofday(&time_start, NULL); 
+      // send input to encoder
+      write_bytes = write(encoder_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
       if(write_bytes < 0){
         char *error_msg = strerror(errno);
-        LOG_E(NR_MAC, "[TEST SEND] Error write data to recver %s\n", error_msg);
-        pthread_exit(NULL); // exit chlid thread
+        LOG_E(NR_MAC, "[TEST SEND] Error write to encoder: %s\n", error_msg);
+        goto out;
       }
-      LOG_W(NR_MAC, "[TEST SEND] send `%s` to recver %s:%d\n", SemanticRL_example[i], recver_ip, recver_port);
+      // read response from encoder
+      read_bytes = read(encoder_socket, response, MAX_PACKET_LEN);    
+      if(read_bytes < 0){
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST SEND] Error read from encoder: %s\n", error_msg);
+        goto out;
+      }
+      gettimeofday(&time_end, NULL); // encoding time
+      LOG_W(NR_MAC, "[TEST SEND] Client: Recieve response `%s` from encoder\n", response);
+      
+      diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
+      LOG_W(NR_MAC, "[TEST SEND] Encoding time: %.3f ms\n", diff);
+      if(!(diff < 10))
+          exceed_10ms += 1;
+
+      // send encoding response to recver
+      write_bytes = send(recver_socket, response, strlen(response), 0);
+      if(write_bytes < 0){
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST SEND] Error send to recver: %s\n", error_msg);
+        goto out;
+      }
+      LOG_W(NR_MAC, "[TEST SEND] send `%s` to recver %s:%d\n", response, recver_ip, recver_port);
+      // wait for recver ok
+      // recv(recver_socket, response, MAX_PACKET_LEN, 0);
+      // LOG_W(NR_MAC, "[TEST SEND] send ACK to recver %s:%d\n", recver_ip, recver_port);
+
+      // write_bytes = write(recver_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
+      // if(write_bytes < 0){
+      //   char *error_msg = strerror(errno);
+      //   LOG_E(NR_MAC, "[TEST SEND] Error write data to recver %s\n", error_msg);
+      //   pthread_exit(NULL); // exit chlid thread
+      // }
+      // LOG_W(NR_MAC, "[TEST SEND] send `%s` to recver %s:%d\n", SemanticRL_example[i], recver_ip, recver_port);
     }
   }
 
-  // printf("%d/%d exceed 10ms\n", exceed_10ms, TEST_TIME);
+  LOG_W(NR_MAC, "[TEST SEND] %d/%d exceed 10ms\n", exceed_10ms, TEST_TIME);
   
-  // close(encoder_socket);
-  close(recver_socket);
-  // free(response);
-
-  pthread_exit(NULL); // exit chlid thread
+  out: 
+    close(encoder_socket);
+    close(recver_socket);
+    pthread_exit(NULL); // exit chlid thread
 }
 
 static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
