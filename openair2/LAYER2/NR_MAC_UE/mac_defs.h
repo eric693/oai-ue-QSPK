@@ -63,6 +63,17 @@
 #include "NR_MeasConfig.h"
 #include "NR_ServingCellConfigCommonSIB.h"
 
+/* Recver test */
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+
+#define RECVER_PORT 6666
+#define TEST_TIME 1
+
 
 // ==========
 // NR UE defs

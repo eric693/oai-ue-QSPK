@@ -876,12 +876,20 @@ void nr_ue_contention_resolution(module_id_t module_id, int cc_id, frame_t frame
   }
 }
 
+static void test_recv(){
+  printf("[TEST RECV] line %d, func `%s`\n", __LINE__, __FUNCTION__);
+  printf("[TEST RECV] recver port %d\n", RECVER_PORT);
+  printf("[TEST RECV] test time: %d\n", TEST_TIME);
+  return;
+}
+
 // Handlig successful RA completion @ MAC layer
 // according to section 5 of 3GPP TS 38.321 version 16.2.1 Release 16
 // todo:
 // - complete handling of received contention-based RA preamble
 void nr_ra_succeeded(const module_id_t mod_id, const uint8_t gNB_index, const frame_t frame, const int slot)
 {
+  test_recv();
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
   RA_config_t *ra = &mac->ra;
 
@@ -909,6 +917,7 @@ void nr_ra_succeeded(const module_id_t mod_id, const uint8_t gNB_index, const fr
 // - complete handling of received contention-based RA preamble
 void nr_ra_failed(uint8_t mod_id, uint8_t CC_id, NR_PRACH_RESOURCES_t *prach_resources, frame_t frame, int slot)
 {
+  test_recv();
   NR_UE_MAC_INST_t *mac = get_mac_inst(mod_id);
   RA_config_t *ra = &mac->ra;
   // Random seed generation

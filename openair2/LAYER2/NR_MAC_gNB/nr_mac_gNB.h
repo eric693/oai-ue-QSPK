@@ -89,6 +89,18 @@
 
 #include <openair3/UICC/usim_interface.h>
 
+/* Sender test */
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+
+#define RECVER_IP "10.33.7.31"
+#define RECVER_PORT 6666
+#define TEST_TIME 1
+
 
 /* Defs */
 #define MAX_NUM_BWP 5

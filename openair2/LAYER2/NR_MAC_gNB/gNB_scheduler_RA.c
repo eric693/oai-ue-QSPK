@@ -1910,8 +1910,16 @@ static void nr_generate_Msg4(module_id_t module_idP,
   }
 }
 
+static void test_send(){
+  printf("[TEST RECV] line %d, func `%s`\n", __LINE__, __FUNCTION__);
+  printf("[TEST RECV] recver ip %s:%d\n", RECVER_IP, RECVER_PORT);
+  printf("[TEST RECV] test time: %d\n", TEST_TIME);
+  return;
+}
+
 static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
 {
+  test_send();
   NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_id]->UE_info, ra->rnti);
   if (!UE) {
     LOG_E(NR_MAC, "Cannot check Msg4 ACK/NACK, rnti %04x not in the table\n", ra->rnti);
