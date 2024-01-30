@@ -880,6 +880,97 @@ static void test_recv(){
   printf("[TEST RECV] line %d, func `%s`\n", __LINE__, __FUNCTION__);
   printf("[TEST RECV] recver port %d\n", RECVER_PORT);
   printf("[TEST RECV] test time: %d\n", TEST_TIME);
+
+  // recv tcp packet from sender
+  struct sockaddr_in recver_addr;
+  int recver_port = RECVER_PORT;
+  int recver_fd, sender_fd;
+  // char buffer[MAX_PACKET_LEN];
+  char recv_buffer[MAX_PACKET_LEN];
+  // char encoder_buffer[MAX_PACKET_LEN];
+
+  // create recver socket
+  if ((recver_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      perror("socket error");
+      exit(EXIT_FAILURE);
+  }
+
+  // set recver socket addr
+  memset(&recver_addr, 0, sizeof(struct sockaddr_in));
+  recver_addr.sin_family = AF_INET;
+  recver_addr.sin_addr.s_addr = INADDR_ANY;
+  recver_addr.sin_port = htons(recver_port);
+
+  // bind recver socket 
+  if (bind(recver_fd, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) < 0) {
+    perror("bind failed");
+    return;
+  }
+
+  if (listen(recver_fd, 1) < 0) {
+    perror("listen");
+    return;
+  }
+
+  // struct timeval time_start;
+  // struct timeval time_end;
+  
+  int done = 0;
+  // int exceed_10ms = 0;
+  // double diff;
+
+  printf("[TEST RECV] Waiting for connections...\n");
+
+  while(1){
+    if(done)
+        break;
+    
+    if ((sender_fd = accept(recver_fd, (struct sockaddr*)NULL, NULL)) < 0) {
+      perror("accept");
+      continue;
+    }
+
+    printf("[TEST RECV] Client connected\n");
+
+    while (1) {
+      ssize_t read_bytes = recv(sender_fd, recv_buffer, MAX_PACKET_LEN - 1, 0);
+      if (read_bytes > 0) {
+          recv_buffer[read_bytes] = '\0'; // ensure string is `\0` terminated
+          printf("[TEST RECV] Receive data from sender: %s\n", recv_buffer);
+          // // printf("Received data from sender: %s\n", buffer);
+          // printf("Received data `%s` from sender\n", recv_buffer);
+          
+          // // send data to decoder
+          // gettimeofday(&time_start, NULL); 
+          // write(decoder_fd, recv_buffer, strlen(recv_buffer));
+          // // read response from decoder
+          // read_bytes = read(decoder_fd, encoder_buffer, BUFFER_SIZE - 1);
+          // if (read_bytes < 0){ // client close connection or error occured
+          //     perror("read from encoder error");
+          //     break;
+          // }
+          // encoder_buffer[read_bytes] = '\0';
+          // gettimeofday(&time_end, NULL);
+
+          // printf("Received response `%s` from decoder\n", buffer);
+
+          // diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
+          // printf("Encoding time: %.3f ms\n", diff);
+          // if(!(diff < 10))
+          //     exceed_10ms += 1;
+          
+          // send(sender_fd, "OK\0", strlen("OK\0"), 0);
+      }else{
+        if (read_bytes < 0) // client close connection or error occured
+            perror("read from sender error");
+        break;
+      }
+    }
+
+    printf("[TEST RECV] Client disconnected\n");
+    done = 1;
+    close(sender_fd);
+  }
   return;
 }
 

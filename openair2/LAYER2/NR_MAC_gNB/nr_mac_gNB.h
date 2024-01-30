@@ -100,7 +100,8 @@
 #define RECVER_IP "10.33.7.31"
 #define RECVER_PORT 6666
 #define TEST_TIME 1
-
+#define EXAMPLE_LEN 1
+#define MAX_PACKET_LEN 256
 
 /* Defs */
 #define MAX_NUM_BWP 5

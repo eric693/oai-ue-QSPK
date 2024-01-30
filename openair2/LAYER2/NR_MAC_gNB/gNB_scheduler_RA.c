@@ -1911,15 +1911,87 @@ static void nr_generate_Msg4(module_id_t module_idP,
 }
 
 static void test_send(){
-  printf("[TEST RECV] line %d, func `%s`\n", __LINE__, __FUNCTION__);
-  printf("[TEST RECV] recver ip %s:%d\n", RECVER_IP, RECVER_PORT);
-  printf("[TEST RECV] test time: %d\n", TEST_TIME);
+  printf("[TEST SEND] line %d, func `%s`\n", __LINE__, __FUNCTION__);
+  printf("[TEST SEND] recver ip %s:%d\n", RECVER_IP, RECVER_PORT);
+  printf("[TEST SEND] test time: %d\n", TEST_TIME);
+  // send tcp packet
+  const char * const SemanticRL_example[EXAMPLE_LEN] = {
+    "planets engage in an eternal graceful dance around sun rise\0"
+  };
+  // char *response = (char*)malloc(sizeof(char) * MAX_PACKET_LEN);
+
+  char *recver_ip = RECVER_IP;
+  int recver_port = RECVER_PORT;
+  int recver_socket;
+  int write_bytes;
+  struct sockaddr_in recver_addr;
+
+  recver_socket = socket(AF_INET, SOCK_STREAM, 0);
+
+  recver_addr.sin_family = AF_INET;
+  recver_addr.sin_port = htons(recver_port);
+
+  if(inet_pton(AF_INET, recver_ip, &recver_addr.sin_addr) <= 0) {
+    fprintf(stderr,"Invalid ip address/ Address not supported \n");
+    return;
+  }
+
+  if(connect(recver_socket, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) == -1){
+    perror("Error connect to recver: ");
+    return;
+  }
+
+  // struct timeval time_start;
+  // struct timeval time_end;
+
+  // int exceed_10ms = 0;
+  // double diff;
+    
+  for(int t = 0;t < TEST_TIME;t++){
+    for(int i = 0;i < EXAMPLE_LEN;i++){
+      // gettimeofday(&time_start, NULL); 
+      // // send input to encoder
+      // write(encoder_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
+      // // read response from encoder
+      // read(encoder_socket, response, MAX_PACKET_LEN);    
+      // gettimeofday(&time_end, NULL); // encoding time
+      // printf("Client: Recieve response `%s` from encoder\n", response);
+      
+      // printf("Client: Recieve response\n\t`%s`\nfrom encoder\n", response);
+      
+      // diff = ((double)((time_end.tv_sec - time_start.tv_sec)*1000000L + time_end.tv_usec - time_start.tv_usec)) / 1000;
+      // printf("Encoding time: %.3f ms\n", diff);
+      // if(!(diff < 10))
+      //     exceed_10ms += 1;
+
+      // send encoding response to recver
+      // write(recver_socket, response, strlen(response));
+      // send(recver_socket, response, strlen(response), 0);
+      // wait for recver ok
+      // read(recver_socket, response, MAX_PACKET_LEN);
+      // recv(recver_socket, response, MAX_PACKET_LEN, 0);
+
+      write_bytes = write(recver_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
+      if(write_bytes < 0){
+        perror("Error write data to recver: ");
+        return;
+      }
+      printf("[TEST SEND] send `%s` to recver %s:%d\n", SemanticRL_example[i], recver_ip, recver_port);
+    }
+  }
+
+  // printf("%d/%d exceed 10ms\n", exceed_10ms, TEST_TIME);
+  
+  // close(encoder_socket);
+  close(recver_socket);
+  // free(response);
+
   return;
 }
 
 static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
 {
-  test_send();
+  
   NR_UE_info_t *UE = find_nr_UE(&RC.nrmac[module_id]->UE_info, ra->rnti);
   if (!UE) {
     LOG_E(NR_MAC, "Cannot check Msg4 ACK/NACK, rnti %04x not in the table\n", ra->rnti);
@@ -1936,6 +2008,7 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
     if (harq->round == 0) {
       if (UE->Msg4_ACKed) {
         LOG_A(NR_MAC, "(UE RNTI 0x%04x) Received Ack of RA-Msg4. CBRA procedure succeeded!\n", ra->rnti);
+        test_send();
       } else {
         LOG_I(NR_MAC, "%4d.%2d UE %04x: RA Procedure failed at Msg4!\n", frame, slot, ra->rnti);
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);

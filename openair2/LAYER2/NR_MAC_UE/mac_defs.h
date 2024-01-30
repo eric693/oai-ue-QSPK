@@ -73,7 +73,7 @@
 
 #define RECVER_PORT 6666
 #define TEST_TIME 1
-
+#define MAX_PACKET_LEN 256
 
 // ==========
 // NR UE defs
