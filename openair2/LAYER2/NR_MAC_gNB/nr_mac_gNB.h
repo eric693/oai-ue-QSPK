@@ -96,6 +96,8 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <arpa/inet.h>
+#include <errno.h>
+#include <pthread.h>
 
 #define RECVER_IP "10.33.7.31"
 #define RECVER_PORT 6666

@@ -1910,10 +1910,8 @@ static void nr_generate_Msg4(module_id_t module_idP,
   }
 }
 
-static void test_send(){
-  printf("[TEST SEND] line %d, func `%s`\n", __LINE__, __FUNCTION__);
-  printf("[TEST SEND] recver ip %s:%d\n", RECVER_IP, RECVER_PORT);
-  printf("[TEST SEND] test time: %d\n", TEST_TIME);
+static void* test_send(void *args){
+  LOG_W(NR_MAC, "[TEST SEND] recver ip %s:%d, test time: %d\n", RECVER_IP, RECVER_PORT, TEST_TIME);
   // send tcp packet
   const char * const SemanticRL_example[EXAMPLE_LEN] = {
     "planets engage in an eternal graceful dance around sun rise\0"
@@ -1932,13 +1930,15 @@ static void test_send(){
   recver_addr.sin_port = htons(recver_port);
 
   if(inet_pton(AF_INET, recver_ip, &recver_addr.sin_addr) <= 0) {
-    fprintf(stderr,"Invalid ip address/ Address not supported \n");
-    return;
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST SEND] Invalid ip address / Address not supported\n");
+    pthread_exit(NULL); // exit chlid thread
   }
 
   if(connect(recver_socket, (struct sockaddr *)&recver_addr, sizeof(recver_addr)) == -1){
-    perror("Error connect to recver: ");
-    return;
+    char *error_msg = strerror(errno);
+    LOG_E(NR_MAC, "[TEST SEND] Error connect to recver %s\n", error_msg);
+    pthread_exit(NULL); // exit chlid thread
   }
 
   // struct timeval time_start;
@@ -1973,10 +1973,11 @@ static void test_send(){
 
       write_bytes = write(recver_socket, SemanticRL_example[i], strlen(SemanticRL_example[i]));
       if(write_bytes < 0){
-        perror("Error write data to recver: ");
-        return;
+        char *error_msg = strerror(errno);
+        LOG_E(NR_MAC, "[TEST SEND] Error write data to recver %s\n", error_msg);
+        pthread_exit(NULL); // exit chlid thread
       }
-      printf("[TEST SEND] send `%s` to recver %s:%d\n", SemanticRL_example[i], recver_ip, recver_port);
+      LOG_W(NR_MAC, "[TEST SEND] send `%s` to recver %s:%d\n", SemanticRL_example[i], recver_ip, recver_port);
     }
   }
 
@@ -1986,7 +1987,7 @@ static void test_send(){
   close(recver_socket);
   // free(response);
 
-  return;
+  pthread_exit(NULL); // exit chlid thread
 }
 
 static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, sub_frame_t slot, NR_RA_t *ra)
@@ -2008,7 +2009,10 @@ static void nr_check_Msg4_Ack(module_id_t module_id, int CC_id, frame_t frame, s
     if (harq->round == 0) {
       if (UE->Msg4_ACKed) {
         LOG_A(NR_MAC, "(UE RNTI 0x%04x) Received Ack of RA-Msg4. CBRA procedure succeeded!\n", ra->rnti);
-        test_send();
+        // call test_send in another thread
+        pthread_t thread_id;
+        pthread_create(&thread_id, NULL, test_send, NULL);
+        pthread_detach(thread_id); 
       } else {
         LOG_I(NR_MAC, "%4d.%2d UE %04x: RA Procedure failed at Msg4!\n", frame, slot, ra->rnti);
         nr_mac_trigger_ul_failure(sched_ctrl, UE->current_DL_BWP.scs);
