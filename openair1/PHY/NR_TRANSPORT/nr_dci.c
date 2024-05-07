@@ -66,6 +66,21 @@ void nr_pdcch_scrambling(uint32_t *in,
   }
 }
 
+// semantic DCI table:
+// bit sqe length:2 dim (semantic output  vector) * 2 bits per symbol (QPSK) = 4
+uint8_t dci_table[2] = {
+  0b0000, // 0
+  0b1111  // 1
+};
+
+#define SEMANTIC_CODING_DEBUG
+
+// #define POLAR_CODING_DEBUG
+
+int tx_dci_seq_no = 1;
+int tx_dci_seq_no_max = 1;
+int tx_stop = 0;
+
 void nr_generate_dci(PHY_VARS_gNB *gNB,
                      nfapi_nr_dl_tti_pdcch_pdu_rel15_t *pdcch_pdu_rel15,
                      int32_t *txdataF,
@@ -93,7 +108,7 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
      * in frequency: the first subcarrier is obtained by adding the first CRB overlapping the SSB and the rb_offset for coreset 0
      * or the rb_offset for other coresets
      * in time: by its first slot and its first symbol*/
-    const nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu_rel15->dci_pdu[d];
+    const nfapi_nr_dl_dci_pdu_t *dci_pdu = &pdcch_pdu_rel15->dci_pdu[d];// CHECK: `isTarget` field
 
     if(dci_pdu->ScramblingId != gNB->pdcch_gold_init) {
       gNB->pdcch_gold_init = dci_pdu->ScramblingId;
@@ -137,9 +152,51 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
     uint16_t n_RNTI = dci_pdu->RNTI;
     uint16_t Nid    = dci_pdu->ScramblingId;
     uint16_t scrambling_RNTI = dci_pdu->ScramblingRNTI;
-
+    // printf("tx_dci_seq_no = %d\n", tx_dci_seq_no);
+    // if(tx_dci_seq_no > tx_dci_seq_no_max){
+    //   // write result to log
+    //   exit(0);
+    // }
+    // modify here
+    // replace original output (after rate matching) with self defined payload
     polar_encoder_fast((uint64_t*)dci_pdu->Payload, (void*)encoder_output, n_RNTI, 1, 
                        NR_POLAR_DCI_MESSAGE_TYPE, dci_pdu->PayloadSizeBits, dci_pdu->AggregationLevel);
+    // check E (number of bits after rate matching) 
+    // ... but no polarParams return
+
+#ifdef SEMANTIC_CODING_DEBUG
+    // use E = 108 ???
+    // set E bits. cannot use memset because it set n bytes
+    // if(dci_pdu->isTarget == 1){
+      // LOG_A(PHY, "First Target DCI, AL = %d\n", dci_pdu->AggregationLevel);
+      // AssertFatal(dci_pdu->AggregationLevel == 1, "Target DCI AL must be 1, now AL = %d\n", dci_pdu->AggregationLevel);
+      int target_dci = 1;
+      memset(encoder_output, 0, sizeof(uint32_t)*NR_MAX_DCI_SIZE_DWORD);
+      // encoder_output[0] = 0x00000000;// 32
+      encoder_output[0] = dci_table[target_dci] & 0xFFFFFFFF;// 0x0000000F
+      encoder_output[1] = 0xFFFFF000;// 64
+      encoder_output[2] = 0xFFFFFFFF;// 96
+      encoder_output[3] = 0x00FFFFF0;// 128
+      printf("\nTx\n");
+      for(int i = 0;i < 108;i++){
+        int idiv32 = i / 32;
+        int imod32 = i % 32;
+        if(imod32 == 0 && idiv32 > 0){
+          printf("\n");
+        }
+        if (i % 4 == 0) {
+          printf(" ");
+        }
+        printf("%u", (encoder_output[idiv32] >> (32 - imod32 - 1)) & 1);
+        
+      }
+      printf("\n");
+      printf("DCI seq number = %d, target DCI = %d, target bit sequence = 0x%x, encoded_length = %d\n", tx_dci_seq_no, target_dci, dci_table[target_dci], encoded_length);
+      
+      tx_dci_seq_no += 1;
+    // }
+#endif
+    
 #ifdef DEBUG_CHANNEL_CODING
 //debug dump dci
     printf("polar rnti %x,length %d, L %d\n",n_RNTI, dci_pdu->PayloadSizeBits,pdcch_pdu_rel15->dci_pdu->AggregationLevel);
@@ -164,6 +221,7 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
     /// QPSK modulation
     int16_t mod_dci[NR_MAX_DCI_SIZE>>1] __attribute__((aligned(16)));
     nr_modulation(scrambled_output, encoded_length, DMRS_MOD_ORDER, mod_dci); //Qm = 2 as DMRS is QPSK modulated
+    // nr_modulation(encoder_output, encoded_length, DMRS_MOD_ORDER, mod_dci); //Qm = 2 as DMRS is QPSK modulated
 #ifdef DEBUG_DCI
     
     for (int i=0; i<encoded_length>>1; i++)

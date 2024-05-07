@@ -802,6 +802,49 @@ static uint16_t nr_dci_false_detection(uint64_t *dci,
   return x;
 }
 
+uint8_t table_dci[16] = {
+  0, // 0000
+  0, // 0001
+  0, // 0010
+  0, // 0011
+  0, // 0100
+  0, // 0101
+  0, // 0110
+  1, // 0111
+  0, // 1000
+  0, // 1001
+  0, // 1010
+  1, // 1011
+  0, // 1100
+  1, // 1101
+  1, // 1110
+  1  // 1111
+};
+
+#define SEMANTIC_CODING_DEBUG
+
+#ifdef SEMANTIC_CODING_DEBUG
+#define PRE_LOGGING
+#define POST_LOGGING
+#define test_time 12
+int rx_dci_seq_no = 1;
+int rx_dci_seq_no_max = test_time;
+uint32_t target[4] = {
+  0x00000000,
+  0x000FFFFF,
+  0xFFFFFFFF,
+  0x0FFFFF00
+};
+int visit[test_time]={0};
+#endif 
+
+#ifdef POST_LOGGING
+int check_list[test_time];
+int decode_result_list[test_time];
+int decode_dci_list[test_time];
+uint8_t decode_bit_list[test_time];
+#endif
+
 uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
                                   const UE_nr_rxtx_proc_t *proc,
                                   int16_t *pdcch_e_rx,
@@ -849,11 +892,128 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
         }
       }
 #endif
+
+#ifdef SEMANTIC_CODING_DEBUG
+      
+      if(rx_dci_seq_no > rx_dci_seq_no_max){
+        // write result to log
+#ifdef POST_LOGGING
+        int total_decoded = 0;
+        int total_checked = 0;
+        for(int i = 0;i < rx_dci_seq_no_max;i++){
+          printf("DCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n",
+            i, decode_dci_list[i], decode_bit_list[i], 1, 0b1111, decode_result_list[i], check_list[i]);
+          total_decoded += decode_result_list[i];
+          total_checked += check_list[i];
+        }
+        printf("Total deocded = %d, total checked = %d\n", total_decoded, total_checked);
+#endif 
+        exit(0);
+      }
+      AssertFatal(visit[rx_dci_seq_no-1] == 0, "rx_dci_seq_no != 0, multithread race condition");
+      visit[rx_dci_seq_no-1] = 1;
+      // print to check target DCI
+      uint8_t tmp[128];
+      memset(tmp, 0, sizeof(uint8_t)*128);
+      
+#ifdef PRE_LOGGING
+      printf("\nRX\n");
+      // LOG_D(PHY, "\nRX\n");
+      for (int i = 0; i < 108; i++) {// TODO: why print first ? it's not rm result. (develop version)
+        int idiv32 = i / 32;
+        int imod32 = i % 32;
+        if(imod32 == 0 && idiv32 > 0){
+          printf("\n");
+          // LOG_D(PHY, "\n");
+        }
+        if (i % 4 == 0) {
+          printf(" ");
+          // LOG_D(PHY, " ");
+        }
+        tmp[i] = tmp_e[i] < 0 ? 1 : 0;
+        printf("%i", tmp_e[i] < 0 ? 1 : 0);
+        // LOG_D(PHY, "%i", tmp_e[i] < 0 ? 1 : 0);
+      }
+      printf("\n");
+#endif
+      for(int i = 0;i < 108;i++){
+        tmp[i] = tmp_e[i] < 0 ? 1 : 0;
+      }
+      uint8_t decode_bit = 0;
+      uint8_t target_bit = 0b1111;// useless
+      decode_bit |= tmp[0] << 3;
+      decode_bit |= tmp[1] << 2;
+      decode_bit |= tmp[2] << 1;
+      decode_bit |= tmp[3];
+      target[0] |= (decode_bit & 0xFFFFFFFF) << 28;
+      int decode_dci = table_dci[decode_bit & 0b1111];
+      int target_dci = 1;
+      int check = 1;
+      for(int i = 32;i < 108;i++){
+        int idiv32 = i / 32;
+        int imod32 = i % 32;
+        if((tmp[i] & 1) != ((target[idiv32] >> (32 - imod32 - 1)) & 1)){
+          check = 0;
+          break;
+        }
+      }
+#ifdef PRE_LOGGING
+      LOG_D(PHY, "\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
+            rx_dci_seq_no - 1, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
+      // printf("\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
+      //       rx_dci_seq_no, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
+#endif
+#ifdef POST_LOGGING
+      decode_dci_list[rx_dci_seq_no-1] = decode_dci;
+      decode_bit_list[rx_dci_seq_no-1] = decode_bit;
+      decode_result_list[rx_dci_seq_no-1] = decode_dci == target_dci;
+      check_list[rx_dci_seq_no-1] = check;
+#endif 
+
+      // if(check){
+      //   uint8_t target_bit = 0;
+      //   target_bit |= tmp[0] << 3;
+      //   target_bit |= tmp[1] << 2;
+      //   target_bit |= tmp[2] << 1;
+      //   target_bit |= tmp[3];
+      //   target[0] |= (target_bit & 0xFFFFFFFF) << 28;
+
+      //   printf("\nTarget\n");
+      //   for(int i = 0;i < 108;i++){
+      //     int idiv32 = i / 32;
+      //     int imod32 = i % 32;
+      //     if(imod32 == 0 && idiv32 > 0){
+      //       printf("\n");
+      //     }
+      //     if (i % 4 == 0) {
+      //       printf(" ");
+      //     }
+      //     printf("%u", (target[idiv32] >> (32 - imod32 - 1)) & 1);
+      //   }
+      //   printf("\n");
+
+      //   int target_dci = table_dci[target_bit & 0b1111];
+      //   printf("DCI seq number = %d. Pass = 1, Target bit sequence = 0x%x,  target DCI = %d\n", rx_dci_seq_no, target_bit, target_dci);
+      //   // exit(0);
+      // }else{
+      //   printf("DCI seq number = %d, Pass = 0\n", rx_dci_seq_no);
+      // }
+      rx_dci_seq_no += 1;
+      
+      // if(tmp[0] == 0xFFFFFFFF && tmp[1] == 0xFFFFFFFF && tmp[2] == 0xFFFFFFFF && tmp[3] == 0xFF00000F){
+      //   printf("Receive target DCI!!!\n");
+      //   exit(0);
+      // }
+      // not this way because ...
+      // if(tmp[0] == 0xFFFFFFFF && tmp[1] == 0xFFFFFFFF && tmp[2] == 0xFFFFFFFF && tmp[3] == 0x00000000){
+      //   printf("Receive target DCI (RA msg2) !!!");
+      // }
+#endif
+
       uint16_t crc = polar_decoder_int16(tmp_e,
                                          dci_estimation,
                                          1,
                                          NR_POLAR_DCI_MESSAGE_TYPE, dci_length, L);
-
       n_rnti = rel15->rnti;
       LOG_D(PHY, "(%i.%i) dci indication (rnti %x,dci format %s,n_CCE %d,payloadSize %d,payload %llx )\n",
             proc->frame_rx, proc->nr_slot_rx,n_rnti,nr_dci_format_string[rel15->dci_format_options[k]],CCEind,dci_length, *(unsigned long long*)dci_estimation);
