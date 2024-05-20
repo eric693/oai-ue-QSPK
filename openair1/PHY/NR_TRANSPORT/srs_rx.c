@@ -144,7 +144,7 @@ int nr_get_srs_signal(PHY_VARS_gNB *gNB,
   } // for (int ant = 0; ant < frame_parms->nb_antennas_rx; ant++)
 
   if (no_srs_signal) {
-    LOG_W(NR_PHY, "No SRS signal\n");
+    LOG_D(NR_PHY, "No SRS signal\n");
     return -1;
   } else {
     return 0;

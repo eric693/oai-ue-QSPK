@@ -802,31 +802,52 @@ static uint16_t nr_dci_false_detection(uint64_t *dci,
   return x;
 }
 
+// source
+// uint8_t table_dci[16] = {
+//   0, // 0000
+//   0, // 0001
+//   0, // 0010
+//   0, // 0011
+//   0, // 0100
+//   0, // 0101
+//   0, // 0110
+//   1, // 0111
+//   0, // 1000
+//   0, // 1001
+//   0, // 1010
+//   1, // 1011
+//   0, // 1100
+//   1, // 1101
+//   1, // 1110
+//   1  // 1111
+// };
+
 uint8_t table_dci[16] = {
-  0, // 0000
-  0, // 0001
-  0, // 0010
-  0, // 0011
-  0, // 0100
-  0, // 0101
-  0, // 0110
-  1, // 0111
-  0, // 1000
-  0, // 1001
-  0, // 1010
-  1, // 1011
-  0, // 1100
-  1, // 1101
-  1, // 1110
-  1  // 1111
+  0, // 0000 (0x0)
+  0, // 0001 (0x1)
+  0, // 0010 (0x2)
+  0, // 0011 (0x3)
+  0, // 0100 (0x4)
+  0, // 0101 (0x5)
+  0, // 0110 (0x6)
+  0, // 0111 (0x7)
+  1, // 1000 (0x8)
+  1, // 1001 (0x9)
+  1, // 1010 (0xa)
+  1, // 1011 (0xb)
+  1, // 1100 (0xc)
+  1, // 1101 (0xd)
+  1, // 1110 (0xe)
+  1  // 1111 (0xf)
 };
+
 
 #define SEMANTIC_CODING_DEBUG
 
 #ifdef SEMANTIC_CODING_DEBUG
 #define PRE_LOGGING
 #define POST_LOGGING
-#define test_time 12
+#define test_time 1
 int rx_dci_seq_no = 1;
 int rx_dci_seq_no_max = test_time;
 uint32_t target[4] = {
@@ -869,6 +890,7 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
       for (int ind=0;ind < dci_ind->number_of_dcis ; ind++) {
         if (rel15->rnti== dci_ind->dci_list[ind].rnti &&
             rel15->dci_format_options[k]==dci_ind->dci_list[ind].dci_format) {
+            // LOG_I(PHY, "mwnl %d %d\n", dci_ind->SFN, dci_ind->slot);
            dci_found=1;
            break;
         }
@@ -893,20 +915,24 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
       }
 #endif
 
+
+
+
 #ifdef SEMANTIC_CODING_DEBUG
-      
+
       if(rx_dci_seq_no > rx_dci_seq_no_max){
         // write result to log
 #ifdef POST_LOGGING
         int total_decoded = 0;
         int total_checked = 0;
         for(int i = 0;i < rx_dci_seq_no_max;i++){
-          printf("DCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n",
-            i, decode_dci_list[i], decode_bit_list[i], 1, 0b1111, decode_result_list[i], check_list[i]);
+          printf("Check pass. DCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x\n", 
+            i, decode_dci_list[i], decode_bit_list[i], 1, 0b1111); //, check = %d\n , check_list[i] , decode_result_list[i]
           total_decoded += decode_result_list[i];
           total_checked += check_list[i];
+          
         }
-        printf("Total deocded = %d, total checked = %d\n", total_decoded, total_checked);
+        // printf("Total decoded = %d, total checked = %d\n", total_decoded, total_checked);
 #endif 
         exit(0);
       }
@@ -916,26 +942,84 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
       uint8_t tmp[128];
       memset(tmp, 0, sizeof(uint8_t)*128);
       
+// #ifdef PRE_LOGGING
+//       printf("\nRX\n");
+//       // LOG_D(PHY, "\nRX\n");
+//       for (int i = 0; i < 108; i++) {// TODO: why print first ? it's not rm result. (develop version)
+//         int idiv32 = i / 32;
+//         int imod32 = i % 32;
+//         if(imod32 == 0 && idiv32 > 0){
+//           printf("\n");
+//           // LOG_D(PHY, "\n");
+//         }
+//         if (i % 4 == 0) {
+//           printf(" ");
+//           // LOG_D(PHY, " ");
+//         }
+//         tmp[i] = tmp_e[i] < 0 ? 1 : 0;
+//         printf("%i", tmp_e[i] < 0 ? 1 : 0);
+//         // LOG_D(PHY, "%i", tmp_e[i] < 0 ? 1 : 0);
+//       }
+//       printf("\n");
+//       LOG_I(PHY, "mwnl %d %d\n", proc->frame_rx, proc->nr_slot_rx);
+// #endif
+
+
+// #ifdef PRE_LOGGING
+//       if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
+//           printf("\nRX\n");
+//           // LOG_D(PHY, "\nRX\n");
+//           for (int i = 0; i < 108; i++) {
+//             int idiv32 = i / 32;
+//             int imod32 = i % 32;
+//             if(imod32 == 0 && idiv32 > 0){
+//               printf("\n");
+//               // LOG_D(PHY, "\n");
+//             }
+//             if (i % 4 == 0) {
+//               printf(" ");
+//               // LOG_D(PHY, " ");
+//             }
+//             tmp[i] = tmp_e[i] < 0 ? 1 : 0;
+//             printf("%i", tmp_e[i] < 0 ? 1 : 0);
+//             // LOG_D(PHY, "%i", tmp_e[i] < 0 ? 1 : 0);
+//           }
+//           printf("\n");
+//           // LOG_I(PHY, "mwnl %d %d\n", proc->frame_rx, proc->nr_slot_rx);
+//       }
+// #endif
+
 #ifdef PRE_LOGGING
-      printf("\nRX\n");
-      // LOG_D(PHY, "\nRX\n");
-      for (int i = 0; i < 108; i++) {// TODO: why print first ? it's not rm result. (develop version)
-        int idiv32 = i / 32;
-        int imod32 = i % 32;
+if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
+    printf("\nRX\n");
+    // LOG_D(PHY, "\nRX\n");
+    for (int i = 0; i < 108; i++) {
+        int idiv32 = i / 32; // Division by 32 to find the block of 32 bits
+        int imod32 = i % 32; // Modulus by 32 to find the position within the block
         if(imod32 == 0 && idiv32 > 0){
-          printf("\n");
-          // LOG_D(PHY, "\n");
+            printf("\n");
+            // LOG_D(PHY, "\n");
         }
-        if (i % 4 == 0) {
-          printf(" ");
-          // LOG_D(PHY, " ");
+        if (imod32 % 4 == 0) {
+            printf(" ");
+            // LOG_D(PHY, " ");
         }
+    
+        // Calculate the index to print in reverse order within each block of 32 bits
+        // int reverseIndex = idiv32 * 32 + (31 - imod32);
+
+        // tmp[i] = tmp_e[reverseIndex] < 0 ? 1 : 0;
         tmp[i] = tmp_e[i] < 0 ? 1 : 0;
         printf("%i", tmp_e[i] < 0 ? 1 : 0);
-        // LOG_D(PHY, "%i", tmp_e[i] < 0 ? 1 : 0);
-      }
-      printf("\n");
+        // LOG_D(PHY, "%i", tmp_e[reverseIndex] < 0 ? 1 : 0);
+    }
+    printf("\n");
+    // LOG_I(PHY, "mwnl %d %d\n", proc->frame_rx, proc->nr_slot_rx);
+}
 #endif
+
+
+
       for(int i = 0;i < 108;i++){
         tmp[i] = tmp_e[i] < 0 ? 1 : 0;
       }
@@ -957,6 +1041,8 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
           break;
         }
       }
+
+
 #ifdef PRE_LOGGING
       LOG_D(PHY, "\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
             rx_dci_seq_no - 1, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
@@ -969,35 +1055,39 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
       decode_result_list[rx_dci_seq_no-1] = decode_dci == target_dci;
       check_list[rx_dci_seq_no-1] = check;
 #endif 
+      printf("Check value: %d\n", check);
 
-      // if(check){
-      //   uint8_t target_bit = 0;
-      //   target_bit |= tmp[0] << 3;
-      //   target_bit |= tmp[1] << 2;
-      //   target_bit |= tmp[2] << 1;
-      //   target_bit |= tmp[3];
-      //   target[0] |= (target_bit & 0xFFFFFFFF) << 28;
+      if(check){
+        uint8_t target_bit = 0;
+        target_bit |= tmp[0] << 3;
+        target_bit |= tmp[1] << 2;
+        target_bit |= tmp[2] << 1;
+        target_bit |= tmp[3];
+        target[0] |= (target_bit & 0xFFFFFFFF) << 28;
 
-      //   printf("\nTarget\n");
-      //   for(int i = 0;i < 108;i++){
-      //     int idiv32 = i / 32;
-      //     int imod32 = i % 32;
-      //     if(imod32 == 0 && idiv32 > 0){
-      //       printf("\n");
-      //     }
-      //     if (i % 4 == 0) {
-      //       printf(" ");
-      //     }
-      //     printf("%u", (target[idiv32] >> (32 - imod32 - 1)) & 1);
-      //   }
-      //   printf("\n");
+        printf("\nTarget\n");
+        for(int i = 0;i < 108;i++){
+          int idiv32 = i / 32;
+          int imod32 = i % 32;
+          if(imod32 == 0 && idiv32 > 0){
+            printf("\n");
+          }
+          if (i % 4 == 0) {
+            printf(" ");
+          }
+          printf("%u", (target[idiv32] >> (32 - imod32 - 1)) & 1);
+          // Reverse the bits by accessing them in reverse order within their 32-bit block
+          // printf("%u", (target[idiv32] >> (imod32)) & 1);
+        }
+        printf("\n");
+   
 
-      //   int target_dci = table_dci[target_bit & 0b1111];
-      //   printf("DCI seq number = %d. Pass = 1, Target bit sequence = 0x%x,  target DCI = %d\n", rx_dci_seq_no, target_bit, target_dci);
-      //   // exit(0);
-      // }else{
-      //   printf("DCI seq number = %d, Pass = 0\n", rx_dci_seq_no);
-      // }
+        // int target_dci = table_dci[target_bit & 0b1111];
+        // printf("DCI seq number = %d. Pass = 1, Target bit sequence = 0x%x,  target DCI = %d\n", rx_dci_seq_no, target_bit, target_dci);
+        // exit(0);
+      }else{
+        // printf("DCI seq number = %d, Pass = 0\n", rx_dci_seq_no);
+      }
       rx_dci_seq_no += 1;
       
       // if(tmp[0] == 0xFFFFFFFF && tmp[1] == 0xFFFFFFFF && tmp[2] == 0xFFFFFFFF && tmp[3] == 0xFF00000F){

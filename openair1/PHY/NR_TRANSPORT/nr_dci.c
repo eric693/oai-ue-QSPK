@@ -66,8 +66,9 @@ void nr_pdcch_scrambling(uint32_t *in,
   }
 }
 
-// semantic DCI table:
+
 // bit sqe length:2 dim (semantic output  vector) * 2 bits per symbol (QPSK) = 4
+// Semantic DCI table:
 uint8_t dci_table[2] = {
   0b0000, // 0
   0b1111  // 1
