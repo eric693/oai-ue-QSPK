@@ -691,7 +691,7 @@ static int startClient(openair0_device *device) {
       connected=true;
     }
 
-    LOG_I(HW, "connect() to %s:%d failed, errno(%d)\n", t->ip, t->port, errno);
+    // LOG_I(HW, "connect() to %s:%d failed, errno(%d)\n", t->ip, t->port, errno);
     sleep(1);
   }
 
