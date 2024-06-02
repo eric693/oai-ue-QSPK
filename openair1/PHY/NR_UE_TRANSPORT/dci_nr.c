@@ -184,11 +184,11 @@ static void nr_pdcch_demapping_deinterleaving(uint32_t *llr,
             index_llr = (uint16_t) (f*B_rb + rb + symbol_idx * coreset_nbr_rb) * data_sc;
             for (int i = 0; i < data_sc; i++) {
               e_rx[index_z + i] = llr[index_llr + i];
-#ifdef NR_PDCCH_DCI_DEBUG
-              LOG_I(PHY,"[candidate=%d,symbol_idx=%d,cce=%d,REG bundle=%d,PRB=%d] z[%d]=(%d,%d) <-> \t llr[%d]=(%d,%d) \n",
-                    c_id,symbol_idx,cce_count,k,f*B_rb + rb,(index_z + i),*(int16_t *) &e_rx[index_z + i],*(1 + (int16_t *) &e_rx[index_z + i]),
-                    (index_llr + i),*(int16_t *) &llr[index_llr + i], *(1 + (int16_t *) &llr[index_llr + i]));
-#endif
+// #ifdef NR_PDCCH_DCI_DEBUG
+              // LOG_I(PHY,"[candidate=%d,symbol_idx=%d,cce=%d,REG bundle=%d,PRB=%d] z[%d]=(%d,%d) <-> \t llr[%d]=(%d,%d) \n",
+              //       c_id,symbol_idx,cce_count,k,f*B_rb + rb,(index_z + i),*(int16_t *) &e_rx[index_z + i],*(1 + (int16_t *) &e_rx[index_z + i]),
+              //       (index_llr + i),*(int16_t *) &llr[index_llr + i], *(1 + (int16_t *) &llr[index_llr + i]));
+// #endif
             }
             rb_count++;
           }
@@ -211,9 +211,15 @@ int32_t nr_pdcch_llr(NR_DL_FRAME_PARMS *frame_parms, int32_t rx_size, int32_t rx
   }
 
   LOG_DDD("llr logs: pdcch qpsk llr for symbol %d (pos %d), llr offset %ld\n",symbol,(symbol*frame_parms->N_RB_DL*12),pdcch_llrp-pdcch_llr);
-
+  // LOG_I("llr logs: pdcch qpsk llr for symbol %d (pos %d), llr offset %ld\n",symbol,(symbol*frame_parms->N_RB_DL*12),pdcch_llrp-pdcch_llr);
   //for (i = 0; i < (frame_parms->N_RB_DL * ((symbol == 0) ? 16 : 24)); i++) {
+  
   for (i = 0; i < (coreset_nbr_rb * ((symbol == 0) ? 18 : 18)); i++) {
+ 
+    // int16_t real = rxF[0]; // 
+    // int16_t imag = rxF[1]; // 
+    // printf("i %d: complex symbol = %d + %dj\n", i, real, imag);
+
     if (*rxF > 31)
       *pdcch_llrp = 31;
     else if (*rxF < -32)
@@ -770,7 +776,95 @@ void nr_pdcch_unscrambling(int16_t *e_rx,
   }
 }
 
+typedef struct {
+    float first;
+    float second;
+} FloatPair;
 
+typedef enum {
+    BIT_0 = 0,
+    BIT_1 = 1
+} Bit;
+
+
+// FloatPair getFloatPairFromSequence(unsigned char bitSequence) {
+//     FloatPair pair;
+//     if (bitSequence == 0b0011) {
+//         pair.first = 0.2500;
+//         pair.second = 1.7500;
+//     } else if (bitSequence == 0b1100) {
+//         pair.first = 1.7500;
+//         pair.second = 0.2500;
+//     } else {
+//         pair.first = 0.0;
+//         pair.second = 0.0; // 若沒有匹配，傳回0.0（代表錯誤情況）
+//     }
+//     return pair;
+// }
+
+// // 函數來將bit sequence轉換成bit
+// Bit getBitFromSequence(unsigned char bitSequence) {
+//     if (bitSequence == 0b0011) {
+//         return BIT_1;
+//     } else if (bitSequence == 0b1100) {
+//         return BIT_0;
+//     }
+//     return -1; // 若沒有匹配，傳回-1（代表錯誤情況）
+// }
+
+
+FloatPair getFloatPairFromSequence(unsigned char bitSequence) {
+    FloatPair pair;
+    switch (bitSequence) {
+        case 0b0000: pair = (FloatPair){0.2500, 0.2500}; break;
+        case 0b0001: pair = (FloatPair){0.2500, 0.7500}; break;
+        case 0b0010: pair = (FloatPair){0.2500, 1.2500}; break;
+        case 0b0011: pair = (FloatPair){0.2500, 1.7500}; break;
+        case 0b0100: pair = (FloatPair){0.7500, 0.2500}; break;
+        case 0b0101: pair = (FloatPair){0.7500, 0.7500}; break;
+        case 0b0110: pair = (FloatPair){0.7500, 1.2500}; break;
+        case 0b0111: pair = (FloatPair){0.7500, 1.7500}; break;
+        case 0b1000: pair = (FloatPair){1.2500, 0.2500}; break;
+        case 0b1001: pair = (FloatPair){1.2500, 0.7500}; break;
+        case 0b1010: pair = (FloatPair){1.2500, 1.2500}; break;
+        case 0b1011: pair = (FloatPair){1.2500, 1.7500}; break;
+        case 0b1100: pair = (FloatPair){1.7500, 0.2500}; break;
+        case 0b1101: pair = (FloatPair){1.7500, 0.7500}; break;
+        case 0b1110: pair = (FloatPair){1.7500, 1.2500}; break;
+        case 0b1111: pair = (FloatPair){1.7500, 1.7500}; break;
+        default: pair = (FloatPair){0.0, 0.0}; break; // Error case
+    }
+    return pair;
+}
+
+Bit getBitFromSequence(unsigned char bitSequence) {
+    switch (bitSequence) {
+        case 0b0000: return BIT_0;
+        case 0b0001: return BIT_0;
+        case 0b0010: return BIT_0;
+        case 0b0011: return BIT_1;
+        case 0b0100: return BIT_0;
+        case 0b0101: return BIT_0;
+        case 0b0110: return BIT_1;
+        case 0b0111: return BIT_1;
+        case 0b1000: return BIT_0;
+        case 0b1001: return BIT_0;
+        case 0b1010: return BIT_1;
+        case 0b1011: return BIT_1;
+        case 0b1100: return BIT_0;
+        case 0b1101: return BIT_1;
+        case 0b1110: return BIT_1;
+        case 0b1111: return BIT_1;
+        default: return -1; // Error case
+    }
+}
+
+void printBitSequence(unsigned char bitSequence) {
+    for (int i = 3; i >= 0; i--) {
+        printf("%d", (bitSequence >> i) & 1);
+    }
+    printf("\n");
+}
 /* This function compares the received DCI bits with
  * re-encoded DCI bits and returns the number of mismatched bits
  */
@@ -826,16 +920,16 @@ uint8_t table_dci[16] = {
   0, // 0000 (0x0)
   0, // 0001 (0x1)
   0, // 0010 (0x2)
-  0, // 0011 (0x3)
+  1, // 0011 (0x3)
   0, // 0100 (0x4)
   0, // 0101 (0x5)
-  0, // 0110 (0x6)
-  0, // 0111 (0x7)
-  1, // 1000 (0x8)
-  1, // 1001 (0x9)
+  1, // 0110 (0x6)
+  1, // 0111 (0x7)
+  0, // 1000 (0x8)
+  0, // 1001 (0x9)
   1, // 1010 (0xa)
   1, // 1011 (0xb)
-  1, // 1100 (0xc)
+  0, // 1100 (0xc)
   1, // 1101 (0xd)
   1, // 1110 (0xe)
   1  // 1111 (0xf)
@@ -847,7 +941,7 @@ uint8_t table_dci[16] = {
 #ifdef SEMANTIC_CODING_DEBUG
 #define PRE_LOGGING
 #define POST_LOGGING
-#define test_time 1
+#define test_time 2
 int rx_dci_seq_no = 1;
 int rx_dci_seq_no_max = test_time;
 uint32_t target[4] = {
@@ -926,15 +1020,15 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
         int total_decoded = 0;
         int total_checked = 0;
         for(int i = 0;i < rx_dci_seq_no_max;i++){
-          printf("Check pass. DCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x\n", 
-            i, decode_dci_list[i], decode_bit_list[i], 1, 0b1111); //, check = %d\n , check_list[i] , decode_result_list[i]
+          printf("Check pass. DCI seq number = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x\n", 
+            1, decode_dci_list[i], decode_bit_list[i], 1, 0b0011); //1(i) , check = %d\n , check_list[i] , decode_result_list[i]
           total_decoded += decode_result_list[i];
           total_checked += check_list[i];
           
         }
         // printf("Total decoded = %d, total checked = %d\n", total_decoded, total_checked);
 #endif 
-        exit(0);
+        exit(0); 
       }
       AssertFatal(visit[rx_dci_seq_no-1] == 0, "rx_dci_seq_no != 0, multithread race condition");
       visit[rx_dci_seq_no-1] = 1;
@@ -990,9 +1084,10 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
 // #endif
 
 #ifdef PRE_LOGGING
-if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
+// if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
     printf("\nRX\n");
     // LOG_D(PHY, "\nRX\n");
+    
     for (int i = 0; i < 108; i++) {
         int idiv32 = i / 32; // Division by 32 to find the block of 32 bits
         int imod32 = i % 32; // Modulus by 32 to find the position within the block
@@ -1006,31 +1101,50 @@ if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
         }
     
         // Calculate the index to print in reverse order within each block of 32 bits
-        // int reverseIndex = idiv32 * 32 + (31 - imod32);
-
+        int reverseIndex = idiv32 * 32 + (31 - imod32);
+        printf("%i", tmp_e[reverseIndex] < 0 ? 1 : 0);
         // tmp[i] = tmp_e[reverseIndex] < 0 ? 1 : 0;
-        tmp[i] = tmp_e[i] < 0 ? 1 : 0;
-        printf("%i", tmp_e[i] < 0 ? 1 : 0);
+        // tmp[i] = tmp_e[i] < 0 ? 1 : 0;
+        // printf("%i", tmp_e[i] < 0 ? 1 : 0);
         // LOG_D(PHY, "%i", tmp_e[reverseIndex] < 0 ? 1 : 0);
     }
     printf("\n");
+
+    unsigned char bitSequence = 0;
+    for (int i = 0; i < 4; i++) {
+        int reverseIndex = (31 - i);
+        bitSequence = (bitSequence << 1) | (tmp_e[reverseIndex] < 0 ? 1 : 0);
+    }
+
+    FloatPair receivedPair = getFloatPairFromSequence(bitSequence);
+    printf("\n");
+    printf("Received bit sequence: ");
+    printBitSequence(bitSequence);
+    printf("De-Binarizer:\n");
+    printf("Received FP: [%.4f, %.4f]\n", receivedPair.first, receivedPair.second);
+
+    printf("Decoder:\n");
+    Bit bit = getBitFromSequence(bitSequence);
+    if (bit != -1) {
+        printf("Decoded Bit: %d\n", bit);
+    } else {
+        printf("Error: Invalid bit sequence\n");
+    }
     // LOG_I(PHY, "mwnl %d %d\n", proc->frame_rx, proc->nr_slot_rx);
-}
+// }
 #endif
-
-
 
       for(int i = 0;i < 108;i++){
         tmp[i] = tmp_e[i] < 0 ? 1 : 0;
       }
       uint8_t decode_bit = 0;
-      uint8_t target_bit = 0b1111;// useless
+      
       decode_bit |= tmp[0] << 3;
       decode_bit |= tmp[1] << 2;
       decode_bit |= tmp[2] << 1;
       decode_bit |= tmp[3];
-      target[0] |= (decode_bit & 0xFFFFFFFF) << 28;
-      int decode_dci = table_dci[decode_bit & 0b1111];
+      target[0] |= (bitSequence & 0xFFFFFFFF) << 28;
+      int decode_dci = bitSequence & 0b1111;
       int target_dci = 1;
       int check = 1;
       for(int i = 32;i < 108;i++){
@@ -1042,10 +1156,9 @@ if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
         }
       }
 
-
 #ifdef PRE_LOGGING
-      LOG_D(PHY, "\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
-            rx_dci_seq_no - 1, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
+      // LOG_D(PHY, "\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
+      //       rx_dci_seq_no - 1, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
       // printf("\nDCI seq no. = %d, decode DCI = %d, decode DCI bits = 0x%x, target DCI = %d, target DCI bits = 0x%x, decode = %d, check = %d\n\n",
       //       rx_dci_seq_no, decode_dci, decode_bit, target_dci, target_bit, decode_dci == target_dci, check);
 #endif
@@ -1055,7 +1168,7 @@ if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
       decode_result_list[rx_dci_seq_no-1] = decode_dci == target_dci;
       check_list[rx_dci_seq_no-1] = check;
 #endif 
-      printf("Check value: %d\n", check);
+      // printf("Check value: %d\n", check);
 
       if(check){
         uint8_t target_bit = 0;

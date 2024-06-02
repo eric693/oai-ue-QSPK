@@ -78,7 +78,7 @@ uint8_t dci_table[2] = {
 
 // #define POLAR_CODING_DEBUG
 
-int tx_dci_seq_no = 1;
+int tx_dci_seq_no = 0;
 int tx_dci_seq_no_max = 1;
 int tx_stop = 0;
 
@@ -188,12 +188,13 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
         if (i % 4 == 0) {
           printf(" ");
         }
-        printf("%u", (encoder_output[idiv32] >> (32 - imod32 - 1)) & 1);
-        
+        // printf("%u", (encoder_output[idiv32] >> (32 - imod32 - 1)) & 1);
+        printf("%u", (encoder_output[idiv32] >> imod32) & 1);
+
       }
       printf("\n");
       printf("DCI seq number = %d, target DCI = %d, target bit sequence = 0x%x, encoded_length = %d\n", tx_dci_seq_no, target_dci, dci_table[target_dci], encoded_length);
-      
+      // usleep(500000);
       tx_dci_seq_no += 1;
     // }
 #endif
@@ -222,12 +223,12 @@ void nr_generate_dci(PHY_VARS_gNB *gNB,
     /// QPSK modulation
     int16_t mod_dci[NR_MAX_DCI_SIZE>>1] __attribute__((aligned(16)));
     nr_modulation(scrambled_output, encoded_length, DMRS_MOD_ORDER, mod_dci); //Qm = 2 as DMRS is QPSK modulated
-    // nr_modulation(encoder_output, encoded_length, DMRS_MOD_ORDER, mod_dci); //Qm = 2 as DMRS is QPSK modulated
-#ifdef DEBUG_DCI
-    
+  
+
+#ifdef DEBUG_DCI       
     for (int i=0; i<encoded_length>>1; i++)
       printf("i %d mod_dci %d %d\n", i, mod_dci[i<<1], mod_dci[(i<<1)+1] );
-    
+
 #endif
 
     /// Resource mapping
