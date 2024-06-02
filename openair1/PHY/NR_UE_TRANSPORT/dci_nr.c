@@ -1084,7 +1084,7 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
 // #endif
 
 #ifdef PRE_LOGGING
-// if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
+if (proc->nr_slot_rx % 2 == 0) { // Check if the slot is even
     printf("\nRX\n");
     // LOG_D(PHY, "\nRX\n");
     
@@ -1131,7 +1131,7 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
         printf("Error: Invalid bit sequence\n");
     }
     // LOG_I(PHY, "mwnl %d %d\n", proc->frame_rx, proc->nr_slot_rx);
-// }
+}
 #endif
 
       for(int i = 0;i < 108;i++){
@@ -1143,8 +1143,8 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
       decode_bit |= tmp[1] << 2;
       decode_bit |= tmp[2] << 1;
       decode_bit |= tmp[3];
-      target[0] |= (bitSequence & 0xFFFFFFFF) << 28;
-      int decode_dci = bitSequence & 0b1111;
+      // target[0] |= (bitSequence & 0xFFFFFFFF) << 28;
+      int decode_dci = 0xFFFFFFFF & 0b1111;
       int target_dci = 1;
       int check = 1;
       for(int i = 32;i < 108;i++){
@@ -1178,17 +1178,17 @@ uint8_t nr_dci_decoding_procedure(PHY_VARS_NR_UE *ue,
         target_bit |= tmp[3];
         target[0] |= (target_bit & 0xFFFFFFFF) << 28;
 
-        printf("\nTarget\n");
+        // printf("\nTarget\n");
         for(int i = 0;i < 108;i++){
           int idiv32 = i / 32;
           int imod32 = i % 32;
           if(imod32 == 0 && idiv32 > 0){
-            printf("\n");
+            // printf("\n");
           }
           if (i % 4 == 0) {
-            printf(" ");
+            // printf(" ");
           }
-          printf("%u", (target[idiv32] >> (32 - imod32 - 1)) & 1);
+          // printf("%u", (target[idiv32] >> (32 - imod32 - 1)) & 1);
           // Reverse the bits by accessing them in reverse order within their 32-bit block
           // printf("%u", (target[idiv32] >> (imod32)) & 1);
         }
